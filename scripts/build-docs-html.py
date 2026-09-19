@@ -17,6 +17,9 @@
   - 生成导览 index.md（系统级/域级/页级三级中文层级）并渲染为 index.html
   - 递归渲染 site_dir 下所有 .md → 同目录同名 .html
   - 每页顶部生成「← 站点首页」面包屑与所属板块标签（按一级子目录分组）
+  - 全站固定左上角「← 返回导览」按钮：除根 index.html 外，所有 .html
+    （含源里自带的交互式图 HTML）都注入一个 position:fixed 的左上角悬浮按钮，
+    按页面目录深度自动计算到根 index.html 的相对路径；脚本幂等（带标记，重跑不重复注入）
 """
 import argparse
 import re
@@ -243,6 +246,58 @@ def rewrite_links(html: str) -> str:
         anchor = m.group(2) or ""
         return f'href="{m.group(1)}.html{anchor}"'
     return re.sub(r'href="([^"]+)\.md(#.*)?"', repl, html)
+
+
+# ---- 全站左上角「返回导览」按钮（幂等注入） ----
+
+BACK_BUTTON_MARK = "<!-- back-to-index -->"
+
+BACK_BUTTON_CSS = """
+.back-to-index-btn {
+  position: fixed; top: 14px; left: 14px; z-index: 2147483647;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #1f5f8b; color: #ffffff;
+  padding: 7px 14px; border-radius: 999px;
+  font: 600 13px/1.4 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  text-decoration: none; border: none;
+  box-shadow: 0 2px 10px rgba(0,0,0,.18);
+}
+.back-to-index-btn:hover { background: #174a6d; }
+"""
+
+
+def back_button_html(html_path: Path, root: Path) -> str:
+    """根据 html 文件相对站点根的深度，生成指向根 index.html 的左上角按钮片段。"""
+    rel = html_path.relative_to(root)
+    depth = len(rel.parent.parts)  # 0 = 文件直接在站点根
+    prefix = "../" * depth
+    return (
+        f"{BACK_BUTTON_MARK}\n"
+        f"<style>{BACK_BUTTON_CSS}</style>\n"
+        f'<a class="back-to-index-btn" href="{prefix}index.html" title="返回导览首页">← 返回导览</a>\n'
+    )
+
+
+def inject_back_buttons(root: Path) -> int:
+    """给除根 index.html 外的所有 .html 注入左上角返回按钮（字节级插入，幂等）。"""
+    injected = 0
+    mark = BACK_BUTTON_MARK.encode("utf-8")
+    needle = b"</body>"
+    for html in sorted(root.rglob("*.html")):
+        if html.name == "index.html":
+            continue
+        raw = html.read_bytes()
+        if mark in raw:
+            continue
+        snippet = back_button_html(html, root).encode("utf-8")
+        idx = raw.lower().rfind(needle)  # 兼容 </BODY> 等大小写
+        if idx != -1:
+            raw = raw[:idx] + snippet + b"\n" + raw[idx:]
+        else:
+            raw = raw + b"\n" + snippet
+        html.write_bytes(raw)
+        injected += 1
+    return injected
 
 
 def render_one(md_path: Path, root: Path, site_name: str, group_labels: dict) -> Path:
@@ -528,6 +583,9 @@ def main():
         out = render_one(md, root, args.site_name, group_labels)
         print(f"built: {out.relative_to(root)}")
     print(f"done: {len(mds)} markdown files rendered (incl. nav index)")
+
+    n = inject_back_buttons(root)
+    print(f"back-to-index button injected into {n} html page(s)")
     return 0
 
 
