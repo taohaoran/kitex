@@ -17,9 +17,10 @@
   - 生成导览 index.md（系统级/域级/页级三级中文层级）并渲染为 index.html
   - 递归渲染 site_dir 下所有 .md → 同目录同名 .html
   - 每页顶部生成「← 站点首页」面包屑与所属板块标签（按一级子目录分组）
-  - 全站固定左上角「← 返回导览」按钮：除根 index.html 外，所有 .html
-    （含源里自带的交互式图 HTML）都注入一个 position:fixed 的左上角悬浮按钮，
-    按页面目录深度自动计算到根 index.html 的相对路径；脚本幂等（带标记，重跑不重复注入）
+  - 全站固定左上角「←」小按钮：除根 index.html 外，所有 .html
+    （含源里自带的交互式图 HTML）都注入一个 34px 的 fixed 左上角小方块（只含箭头，
+    尽量小、尽量靠上，减少对图中文字的遮挡），按页面目录深度自动计算到根 index.html 的相对路径；
+    脚本幂等（带标记，重跑不重复注入）
 """
 import argparse
 import re
@@ -254,27 +255,27 @@ BACK_BUTTON_MARK = "<!-- back-to-index -->"
 
 BACK_BUTTON_CSS = """
 .back-to-index-btn {
-  position: fixed; top: 14px; left: 14px; z-index: 2147483647;
-  display: inline-flex; align-items: center; gap: 6px;
-  background: #1f5f8b; color: #ffffff;
-  padding: 7px 14px; border-radius: 999px;
-  font: 600 13px/1.4 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  position: fixed; top: 8px; left: 8px; z-index: 2147483647;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 8px;
+  background: rgba(31,95,139,.92); color: #ffffff;
+  font: 700 18px/1 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
   text-decoration: none; border: none;
-  box-shadow: 0 2px 10px rgba(0,0,0,.18);
+  box-shadow: 0 1px 5px rgba(0,0,0,.25);
 }
 .back-to-index-btn:hover { background: #174a6d; }
 """
 
 
 def back_button_html(html_path: Path, root: Path) -> str:
-    """根据 html 文件相对站点根的深度，生成指向根 index.html 的左上角按钮片段。"""
+    """根据 html 文件相对站点根的深度，生成指向根 index.html 的左上角小箭头按钮片段。"""
     rel = html_path.relative_to(root)
     depth = len(rel.parent.parts)  # 0 = 文件直接在站点根
     prefix = "../" * depth
     return (
         f"{BACK_BUTTON_MARK}\n"
         f"<style>{BACK_BUTTON_CSS}</style>\n"
-        f'<a class="back-to-index-btn" href="{prefix}index.html" title="返回导览首页">← 返回导览</a>\n'
+        f'<a class="back-to-index-btn" href="{prefix}index.html" title="返回导览首页">←</a>\n'
     )
 
 
