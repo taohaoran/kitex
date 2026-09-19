@@ -1,0 +1,61 @@
+# GitHub Pages 部署 workflow（GitHub Actions 发布源）
+# 内容源优先级: 存在 docs-archify / docs_archify 时严格按其部署；否则回退 docs/。
+# 构建: md->html 渲染 + 三级中文导览 index.html（scripts/build-docs-html.py 已入库）。
+name: Deploy docs to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'docs-archify/**'
+      - 'docs_archify/**'
+      - 'scripts/build-docs-html.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build site content (archify source priority)
+        run: |
+          set -euo pipefail
+          rm -rf site && mkdir -p site
+          if [ -d "docs-archify" ] || [ -d "docs_archify" ]; then
+            SRC=""
+            if [ -d "docs-archify" ]; then SRC="docs-archify"; else SRC="docs_archify"; fi
+            echo "==> $SRC found -> deploying its content strictly"
+            cp -R "$SRC/." site/
+          else
+            echo "==> no archify source dir found -> deploying docs"
+            cp -R docs/. site/
+          fi
+          pip install --quiet markdown
+          python3 scripts/build-docs-html.py site --site-name "Kitex 架构文档" --group-label "architecture=架构文档" --label-map "client-core=客户端核心|server-core=服务端核心|governance=治理|observability=可观测性|streaming=流式|json=JSON|advanced-tool=高级工具|protocol-generic=协议泛化|remote-transport=远程传输|transport-implementations=传输实现"
+          touch site/.nojekyll
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
