@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    schedule:
+      interval: daily
+      time: "10:00"
+      timezone: Asia/Shanghai
+    allow:
+      - dependency-name: github.com/cloudwego/*
+        dependency-type: all
+      - dependency-name: github.com/bytedance/sonic
+        dependency-type: all
+    groups:
+      cloudwego-dependencies:
+        patterns:
+          - github.com/cloudwego/*
+          - github.com/bytedance/sonic
+    directories:
+      - /
